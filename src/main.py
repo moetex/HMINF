@@ -2,7 +2,12 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Final, NamedTuple, final,Generator
 
+import numpy as np
 import pyray
+from pyray import *
+
+from box import Box
+
 
 class Context(NamedTuple):
     screen_width: int
@@ -47,12 +52,57 @@ def create_context(
         pyray.close_window()
 
 
+
+BOX_LENGTH = 20
+box = Box(
+    np.array([
+        [-BOX_LENGTH, 0, -BOX_LENGTH],
+        [BOX_LENGTH, 0, -BOX_LENGTH],
+        [BOX_LENGTH, BOX_LENGTH, -BOX_LENGTH],
+        [-BOX_LENGTH, BOX_LENGTH, -BOX_LENGTH],
+        [-BOX_LENGTH, 0, BOX_LENGTH],
+        [BOX_LENGTH, 0, BOX_LENGTH],
+        [BOX_LENGTH, BOX_LENGTH, BOX_LENGTH],
+        [-BOX_LENGTH, BOX_LENGTH, BOX_LENGTH]
+    ])
+)
+
+
+camera = Camera3D(
+    [BOX_LENGTH * 3] * 3,
+    [0.0, 0.0, 0.0],
+    [0.0, 1.0, 0.0],
+    45.0,
+    0
+)
+
+
+
 def main():
+
+    position = np.array([0.0, 2.0, 0.0])
+    velocity = np.array([0.5, 0.3, 0.7])
+    radius = 2
+
+
     with create_context() as context:
         while not context.should_close():
+            position += velocity
+            offset = box.check_collision(position, radius)
+            for i in range(3):
+                if offset[i] != 0:
+                    position[i] += offset[i]
+                    velocity[i] *= -1
+
             context.begin()
             clear_background(WHITE)
-            draw_text("HMINF", int(context.screen_width / 2), 40, 120, GREEN)
+
+            begin_mode_3d(camera)
+            draw_cube_wires(Vector3(*box.center), *box.size, BLUE)
+            draw_sphere(Vector3(*position), radius, RED)
+            end_mode_3d()
+
+            draw_text("HMINF", int(context.screen_width / 2), 40, 22, GREEN)
             context.end()
 
 if __name__ == '__main__':
