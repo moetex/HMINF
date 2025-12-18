@@ -53,7 +53,7 @@ def create_context(
 
 
 
-BOX_LENGTH = 20
+BOX_LENGTH = 60
 box = Box(
     np.array([
         [-BOX_LENGTH, 0, -BOX_LENGTH],
@@ -86,6 +86,9 @@ def main():
 
 
     with create_context() as context:
+        # https://free3d.com/3d-model/-oz-beer-bottle-v2--175362.html
+        model = pyray.load_model("assets/bottle.obj")
+
         while not context.should_close():
             position += velocity
             offset = box.check_collision(position, radius)
@@ -98,12 +101,15 @@ def main():
             clear_background(WHITE)
 
             begin_mode_3d(camera)
+            draw_model(model, Vector3(0, 0, 0), 2, GREEN)
             draw_cube_wires(Vector3(*box.center), *box.size, BLUE)
-            draw_sphere(Vector3(*position), radius, RED)
+            #draw_sphere(Vector3(*position), radius, RED)
             end_mode_3d()
 
-            draw_text("HMINF", int(context.screen_width / 2), 40, 22, GREEN)
+            draw_text("HMINF", context.screen_width // 2 - 40, 40, 22, GREEN)
             context.end()
+        pyray.unload_model(model)
+
 
 if __name__ == '__main__':
     main()
