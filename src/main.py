@@ -2,6 +2,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Final, NamedTuple, final,Generator
 
+import math
 import numpy as np
 import pyray
 from pyray import *
@@ -53,7 +54,7 @@ def create_context(
 
 
 
-BOX_LENGTH = 20
+BOX_LENGTH = 60
 box = Box(
     np.array([
         [-BOX_LENGTH, 0, -BOX_LENGTH],
@@ -76,7 +77,11 @@ camera = Camera3D(
     0
 )
 
-
+def load_model():
+    # https://free3d.com/3d-model/-oz-beer-bottle-v2--175362.html
+    model = pyray.load_model("assets/bottle.obj")
+    model.transform = pyray.matrix_rotate_x(-math.pi / 2)
+    return model
 
 def main():
 
@@ -86,6 +91,7 @@ def main():
 
 
     with create_context() as context:
+        model = load_model()
         while not context.should_close():
             position += velocity
             offset = box.check_collision(position, radius)
@@ -98,12 +104,15 @@ def main():
             clear_background(WHITE)
 
             begin_mode_3d(camera)
+            draw_model(model, Vector3(20, 33, 11), 2, GREEN)
             draw_cube_wires(Vector3(*box.center), *box.size, BLUE)
-            draw_sphere(Vector3(*position), radius, RED)
+            #draw_sphere(Vector3(*position), radius, RED)
             end_mode_3d()
 
-            draw_text("HMINF", int(context.screen_width / 2), 40, 22, GREEN)
+            draw_text("HMINF", context.screen_width // 2 - 40, 40, 22, GREEN)
             context.end()
+        pyray.unload_model(model)
+
 
 if __name__ == '__main__':
     main()
