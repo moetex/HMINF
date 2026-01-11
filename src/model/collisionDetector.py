@@ -41,8 +41,37 @@ def detectCollision(body1_path: str, body2_path: str):
     return gjk.gjk_intersection(c1, c2)
 
 
+def calculateCenterOfMass(mesh):
 
+    # Grenzpunkte bestimmen für Box
+    smallestX = mesh.vertices[0]
+    smallestY = mesh.vertices[0]
+    smallestZ = mesh.vertices[0]
 
+    biggestX = mesh.vertices[0]
+    biggestY = mesh.vertices[0]
+    biggestZ = mesh.vertices[0]
 
+    for v in mesh.vertices:
+        if v[0] < smallestX:
+            smallestX = v
+        if v[1] < smallestY:
+            smallestY = v
+        if v[2] < smallestZ:
+            smallestZ = v
+        if v[0] < biggestX:
+            biggestX = v
+        if v[1] < biggestY:
+            biggestY = v
+        if v[2] < biggestZ:
+            biggestZ = v
 
-
+    # Punkte der Box festlegen
+    cornerAA = [biggestX,smallestY,smallestZ]
+    cornerAB = [biggestX, biggestY, smallestZ]
+    cornerAC = [smallestX, biggestY, smallestZ]
+    cornerAD = [smallestX, smallestY, smallestZ]
+    cornerBA = [biggestX, smallestY, biggestZ]
+    cornerBA = [biggestX, biggestY, biggestZ]
+    cornerBA = [smallestX, biggestY, biggestZ]
+    cornerBA = [smallestX, smallestY, biggestZ]
