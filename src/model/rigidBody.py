@@ -1,7 +1,7 @@
 import numpy as np
 import trimesh
 
-from src.model.Material import Material
+from src.model.material import Material
 from src.model.colliders import ColliderHandle
 from src.res.MathHelpers import Quaternion
 from src.res.MathHelpers import Transform
@@ -89,6 +89,13 @@ class RigidBody:
 
         self.sync()
 
+
+    def set_state(self, x, q, v, w):
+        self.x = np.asarray(x, dtype=float)
+        self.q = np.asarray(q, dtype=float)
+        self.v = np.asarray(v, dtype=float)
+        self.w = np.asarray(w, dtype=float)
+        self.sync()
 
     """
     # Mathe Helfer-Methoden

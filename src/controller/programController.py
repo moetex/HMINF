@@ -1,10 +1,8 @@
-from operator import truediv
-
 import numpy as np
 from kiwisolver import Solver
 
 import src.model.rigidBody as rigidBody
-from src.model.Material import Material, MaterialLibrary
+from src.model.material import Material, MaterialLibrary
 from src.model.boxWorld import BoxWorld
 from src.model.colliders import ColliderHandle
 from src.model.collision import CollisionDetector, ImpulseSolver
@@ -17,7 +15,7 @@ from src.view.visualsVPython import BoxWireframe, VpythonTriangleMeshView, Vpyth
 from distance3d import colliders
 from vpython import (
     canvas, vector, vertex, triangle, rate, color,
-    box as vp_box, curve, color, button, slider, wtext, scene
+    box as vp_box, curve, color, button, slider, wtext, scene, checkbox
 )
 
 
@@ -42,21 +40,19 @@ class Simulation:
         #scene.center = vector(0, 0, 0)
         scene.range = 0.25
 
-        BoxWireframe.draw(self.world.half)
-
         scene.append_to_caption("\n")
         button(text="Pause", bind=self.toggle_run)
-        scene.append_to_caption("\t")
-        wtext(text="\t")
+        #scene.append_to_caption("\t")
+        #wtext(text="\t")
 
         scene.append_to_caption("   ")
-        button(text="Reset", bind=self.reset)
-        scene.append_to_caption("\t")
-        wtext(text="\t")
+        button(text="Reset", bind=lambda _: self.reset())
+        #scene.append_to_caption("\t")
+        #wtext(text="\t")
 
-        scene.append_to_caption("\n")
-        button(text="Settings", bind=self.toggle_settings)
-        scene.append_to_caption("\n")
+        scene.append_to_caption("   ")
+        button(text="Settings", bind=lambda _: self.toggle_settings())
+        scene.append_to_caption("   ")
 
         self.damping_text = wtext(text="Damping: ")
         self.damping_label = wtext(text=f"{self.damping:.4f}")
@@ -73,14 +69,34 @@ class Simulation:
         self.damping_label.visible = False
         self.damping_slider.visible = False
 
+
+
+        #scene.append_to_caption("\n")
+        #button(text="Reset", bind=lambda _: self.reset())
+        #scene.append_to_caption("   ")
+
+
+        # Checkboxen
+        scene.append_to_caption("\n")
+        cb_arrows = checkbox(text="Freiheitsgrade", checked=True, bind=lambda c: self.toggle_Arrows(c.checked))
+        scene.append_to_caption("   ")
+        cb_contacts = checkbox(text="Kontaktpunkte", checked=True, bind=lambda c: self.toggle_contacts(c.checked))
+        scene.append_to_caption("   ")
+        cb_trails = checkbox(text="Kurve/Trail", checked=True, bind=lambda c: self.toggle_trail(c.checked))
+        scene.append_to_caption("   ")
+
+
+
+        BoxWireframe.draw(self.world.half)
+
         mesh_raw = STLMesh.load(stl_path).centered()    # in mm
         mesh_phys = mesh_raw.convex_hull()
-        V_phys_m = mesh_phys.V * 1e-3                 # mm -> m
+        V_m = mesh_phys.V * 1e-3                 # mm -> m
         mesh_vis_m = STLMesh(mesh_raw.V * 1e-3, mesh_raw.F)
 
         #mesh_vis = STLMesh.load(stl_path).centered().scaled_to_radius(18.0) #18.0 Visualisierung frei skalierbar
         #mesh_phys = STLMesh.load(stl_path).convex_hull().centered() #.scaled_to_radius(24.0)  #18.0
-        V_m = mesh_phys.V * 1e-3    # mm -> m
+        #V_m = mesh_phys.V * 1e-3    # mm -> m
 
 
         #mesh_mass = 2.0
@@ -100,6 +116,7 @@ class Simulation:
             collider=mesh_collider,
             visual=mesh_visual
         )
+        self._init_mesh = (self.body_mesh.x.copy(), self.body_mesh.q.copy(), self.body_mesh.v.copy(), self.body_mesh.w.copy())
 
 
         #cube_mass = 1.5
@@ -118,12 +135,13 @@ class Simulation:
             collider=cube_collider,
             visual=cube_visual
         )
+        self._init_cube = (self.body_cube.x.copy(), self.body_cube.q.copy(), self.body_cube.v.copy(), self.body_cube.w.copy())
 
         self.detector = CollisionDetector()
         self.solver = ImpulseSolver(slop=1e-4, baumgarte=0.2)
 
 
-        self.contact_view = ContactDebugView(max_points=64, point_radius=0.004, normal_scale=0.06)
+        self.contact_view = ContactDebugView(max_points=64, point_radius=0.006, normal_scale=0.04)  # 0.004, 0.06
         self.mesh_frame_view = BodyFrameDebugView(axis_len=0.06, show_v_dir=True, show_w_dir=True, v_len=0.05, w_len=0.06, show_trail=True)
         self.cube_frame_view = BodyFrameDebugView(axis_len=0.06, show_v_dir=True, show_w_dir=True, v_len=0.05, w_len=0.06, show_trail=True)
 
@@ -156,7 +174,8 @@ class Simulation:
             self.solver.resolve(self.body_mesh, self.body_cube, c)
 
     def step(self):
-        self._contacts_this_frame.clear()
+        self._contacts_this_frame = []
+        #self._contacts_this_frame.clear()
 
         self.body_mesh.step(self.dt)
         self.body_cube.step(self.dt)
@@ -168,10 +187,12 @@ class Simulation:
             b.v *= self.damping
             b.w *= self.damping
 
+        # Kontaktpunkte anzeigen
         self.contact_view.clear()
         for p, n in self._contacts_this_frame[: self.contact_view.max_points]:
             self.contact_view.add(p, n)
 
+        # Freiheitsgrade
         self.mesh_frame_view.sync(self.body_mesh)
         self.cube_frame_view.sync(self.body_cube)
 
@@ -181,22 +202,37 @@ class Simulation:
             if self.running:
                 self.step()
 
+
     def toggle_run(self, b):
         self.running = not self.running
         b.text = "Pause" if self.running else "Resume"
 
+
+
     def reset(self, _=None):
         # Mesh
-        self.body_mesh.x[:] = [-20, 0, 0]
-        self.body_mesh.q[:] = [1, 0, 0, 0]
-        self.body_mesh.v[:] = [30, 6, 18]
-        self.body_mesh.w[:] = [1.2, 0.4, 0.9]
+        x, q, v, w = self._init_mesh
+        self.body_mesh.set_state(x, q, v, w)
+        #self.body_mesh.x[:] = [-20, 0, 0]
+        #self.body_mesh.q[:] = [1, 0, 0, 0]
+        #self.body_mesh.v[:] = [30, 6, 18]
+        #self.body_mesh.w[:] = [1.2, 0.4, 0.9]
 
         # Cube
-        self.body_cube.x[:] = [20, 0, 0]
-        self.body_cube.q[:] = [1, 0, 0, 0]
-        self.body_cube.v[:] = [-26, -8, 20]
-        self.body_cube.w[:] = [0.7, 1.6, 0.3]
+        x, q, v, w = self._init_cube
+        self.body_cube.set_state(x, q, v, w)
+        #self.body_cube.x[:] = [20, 0, 0]
+        #self.body_cube.q[:] = [1, 0, 0, 0]
+        #self.body_cube.v[:] = [-26, -8, 20]
+        #self.body_cube.w[:] = [0.7, 1.6, 0.3]
+
+        # Anzeigen
+        if hasattr(self, 'contact_view'):
+            self.contact_view.reset()
+        if hasattr(self, 'mesh_frame_view'):
+            self.mesh_frame_view.reset_trail()
+        if hasattr(self, 'cube_frame_view'):
+            self.cube_frame_view.reset_trail()
 
     def toggle_settings(self, _=None):
         self.show_settings = not self.show_settings
@@ -205,5 +241,19 @@ class Simulation:
         self.damping_label.visible = self.show_settings
         self.damping_slider.visible = self.show_settings
 
+    # Slider
     def set_damping(self, s):
         self.damping = s.value
+
+
+    # Checkboxen
+    def toggle_Arrows(self, checked: bool):
+        self.mesh_frame_view.set_gizmo_visible(checked)
+        self.cube_frame_view.set_gizmo_visible(checked)
+
+    def toggle_contacts(self, checken: bool):
+        self.contact_view.set_visible(checken)
+
+    def toggle_trail(self, checked: bool):
+        self.mesh_frame_view.set_trail_visible(checked)
+        self.cube_frame_view.set_trail_visible(checked)

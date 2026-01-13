@@ -1,7 +1,7 @@
 import numpy as np
 from distance3d import mpr
 
-from src.model.Material import Material, PairLookup
+from src.model.material import Material, PairLookup
 from src.model.rigidBody import RigidBody
 
 
