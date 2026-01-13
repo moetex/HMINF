@@ -1,7 +1,6 @@
 import numpy as np
 from vpython import color
 
-from src.model.Material import MaterialLibrary
 from src.model.colliders import ColliderHandle
 from src.model.rigidBody import RigidBody
 

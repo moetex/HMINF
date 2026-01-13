@@ -1,7 +1,7 @@
 import numpy as np
 import trimesh
 
-from src.model.Material import Material
+from src.model.material import Material
 from src.model.colliders import ColliderHandle
 from src.res.MathHelpers import Quaternion
 from src.res.MathHelpers import Transform
