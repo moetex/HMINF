@@ -15,6 +15,7 @@ from src.view.visualsVPython import BoxWireframe, VpythonTriangleMeshView, Vpyth
 from distance3d import colliders
 from vpython import (
     canvas, vector, vertex, triangle, rate, color,
+    box as vp_box, curve, color, button, slider, wtext, scene
     box as vp_box, curve, button, checkbox
 )
 
@@ -37,6 +38,35 @@ class Simulation:
         scene = canvas(title="STL Mesh + Cube in a closed Box", width=1100, height=800, background=color.white)
         #scene.center = vector(0, 0, 0)
         scene.range = 0.25
+
+        scene.append_to_caption("\n")
+        button(text="Pause", bind=self.toggle_run)
+        scene.append_to_caption("\t")
+        wtext(text="\t")
+
+        scene.append_to_caption("   ")
+        button(text="Reset", bind=self.reset)
+        scene.append_to_caption("\t")
+        wtext(text="\t")
+
+        scene.append_to_caption("\n")
+        button(text="Settings", bind=self.toggle_settings)
+        scene.append_to_caption("\n")
+
+        self.damping_text = wtext(text="Damping: ")
+        self.damping_label = wtext(text=f"{self.damping:.4f}")
+        self.damping_slider = slider(
+            min=0.95, max=1.0, value=self.damping,
+            step=0.0001, bind=self.set_damping
+        )
+
+        self.damping_text.visible = False
+        self.damping_label.visible = False
+        self.damping_slider.visible = False
+
+        # Anfangs verstecken
+        self.damping_label.visible = False
+        self.damping_slider.visible = False
 
         scene.append_to_caption("\n")
         button(text="Reset", bind=lambda _: self.reset())
@@ -164,7 +194,14 @@ class Simulation:
     def run(self):
         while True:
             rate(int(1.0 / self.dt))
-            self.step()
+            if self.running:
+                self.step()
+
+
+    def toggle_run(self, b):
+        self.running = not self.running
+        b.text = "Pause" if self.running else "Resume"
+
 
 
     def reset(self, _=None):
@@ -206,8 +243,25 @@ class Simulation:
 
 
 
+    def reset(self, _=None):
+        # Mesh
+        self.body_mesh.x[:] = [-20, 0, 0]
+        self.body_mesh.q[:] = [1, 0, 0, 0]
+        self.body_mesh.v[:] = [30, 6, 18]
+        self.body_mesh.w[:] = [1.2, 0.4, 0.9]
 
+        # Cube
+        self.body_cube.x[:] = [20, 0, 0]
+        self.body_cube.q[:] = [1, 0, 0, 0]
+        self.body_cube.v[:] = [-26, -8, 20]
+        self.body_cube.w[:] = [0.7, 1.6, 0.3]
 
+    def toggle_settings(self, _=None):
+        self.show_settings = not self.show_settings
 
+        self.damping_text.visible = self.show_settings
+        self.damping_label.visible = self.show_settings
+        self.damping_slider.visible = self.show_settings
 
-
+    def set_damping(self, s):
+        self.damping = s.value
