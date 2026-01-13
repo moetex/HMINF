@@ -72,6 +72,7 @@ class ContactDebugView:
         self.max_points = int(max_points)
         self.point_radius = float(point_radius)
         self.normal_scale = float(normal_scale)
+        self.enable = True
 
         self._points = []
         self._normals = []
@@ -83,6 +84,10 @@ class ContactDebugView:
 
         self._count = 0
 
+    def set_visible(self, visible: bool):
+        self.enable = bool(visible)
+        if not self.enable:
+            self.clear()
 
     def clear(self):
         for i in range(self._count):
@@ -109,9 +114,14 @@ class ContactDebugView:
 
         a.pos = vector(p[0], p[1], p[2])
         a.axis = vector(n[0], n[1], n[2]) * self.normal_scale
-        a.visible = True
+        #a.visible = True
+        a.visible = False
 
         self._count += 1
+
+    def reset(self):
+        self.clear()
+
 
 class BodyFrameDebugView:
     def __init__(self, axis_len=0.08, show_v_dir=True, show_w_dir=True, v_len=0.06, w_len=0.05, min_dir_mag=1e-6, show_trail=True, trail_max=400):
@@ -123,6 +133,10 @@ class BodyFrameDebugView:
         self.w_len = float(w_len)
         self.min_dir_mag = float(min_dir_mag)
 
+        #self.enable = True
+        self.gizmo_enable = True
+        self.trail_enable = bool(show_trail)
+
         # Lokale Achsen
         self.ax_x = arrow(color=color.red, schaftwidth=0.006)
         self.ax_y = arrow(color=color.green, schaftwidth=0.006)
@@ -131,11 +145,39 @@ class BodyFrameDebugView:
         self.vel = arrow(color=color.orange, schaftwidth=0.006, visible=self.show_v_dir)
         self.omg = arrow(color=color.magenta, schaftwidth=0.006, visible=self.show_w_dir)
 
-        self.show_trail = bool(show_trail)
+        # Trail
+        #self.show_trail = bool(show_trail)
         self.trail_max = int(trail_max)
         self._trail_points = []
 
-        self.trail = curve(color=color.gray(0.4)) if self.show_trail else None
+        self.trail = curve(color=color.gray(0.4)) if show_trail else None
+
+        self.set_trail_visible(True)
+        self.set_trail_visible(self.trail_enable)
+
+
+    def set_gizmo_visible(self, visible: bool):
+        self.gizmo_enable = bool(visible)
+        self.ax_x.visible = self.gizmo_enable
+        self.ax_y.visible = self.gizmo_enable
+        self.ax_z.visible = self.gizmo_enable
+        self.vel.visible = self.gizmo_enable and self.show_v_dir
+        self.omg.visible = self.gizmo_enable and self.show_w_dir
+        #if self.trail is not None:
+        #    self.trail.visible = self.enable and self.show_trail
+
+    def set_trail_visible(self, visible: bool):
+        self.trail_enable = bool(visible)
+        if self.trail is not None:
+            self.trail.visible = self.trail_enable
+
+    def reset_trail(self):
+        self._trail_points.clear()
+        if self.trail is not None:
+            self.trail.visible = False
+            self.trail = curve(color=color.gray(0.4))
+            self.trail.visible = self.trail_enable
+
 
 
     def _rebuild_trail(self):
@@ -158,35 +200,45 @@ class BodyFrameDebugView:
         arr.visible = True
 
     def sync(self, body):
+        #if not self.enable:
+        #    return
+
         x = np.asarray(body.x, dtype=float)
         R = body.R()
-
         p = vector(x[0], x[1], x[2])
 
-        ex = R[:, 0]; ey = R[:, 1]; ez = R[:, 2]
-        self.ax_x.pos = p; self.ax_x.axis = vector(ex[0], ex[1], ex[2]) * self.axis_len
-        self.ax_y.pos = p; self.ax_y.axis = vector(ey[0], ey[1], ey[2]) * self.axis_len
-        self.ax_z.pos = p; self.ax_z.axis = vector(ez[0], ez[1], ez[2]) * self.axis_len
+        if self.gizmo_enable:
+            ex = R[:, 0]; ey = R[:, 1]; ez = R[:, 2]
+            self.ax_x.pos = p; self.ax_x.axis = vector(ex[0], ex[1], ex[2]) * self.axis_len
+            self.ax_y.pos = p; self.ax_y.axis = vector(ey[0], ey[1], ey[2]) * self.axis_len
+            self.ax_z.pos = p; self.ax_z.axis = vector(ez[0], ez[1], ez[2]) * self.axis_len
 
-        if self.show_v_dir:
-            v = np.asarray(body.v, float)
-            self._set_fixed_arrows(self.vel, p, v, self.v_len)
+            if self.show_v_dir:
+                v = np.asarray(body.v, float)
+                self._set_fixed_arrows(self.vel, p, v, self.v_len)
 
-        if self.show_w_dir:
-            w = np.asarray(body.w, float)
-            self._set_fixed_arrows(self.omg, p, w, self.w_len)
+            if self.show_w_dir:
+                w = np.asarray(body.w, float)
+                self._set_fixed_arrows(self.omg, p, w, self.w_len)
 
         #v = np.asarray(body.v, dtype=float)
         #w = np.asarray(body.w, dtype=float)
         #self.vel.pos = p; self.vel.axis = vector(v[0], v[1], v[2]) * self.vec_scale_v
         #self.omg.pos = p; self.omg.axis = vector(w[0], w[1], w[2]) * self.vec_scale_w
 
-        if self.trail is not None:
+        # Trail
+        if self.trail is not None and self.trail_enable:
             self._trail_points.append(p)
             if len(self._trail_points) > self.trail_max:
-                self._trail_points.pop()
+                self._trail_points.pop(0)
 
-                self._rebuild_trail()
+                # rebuild
+                self.trail.visible = False
+                self.trail = curve(color=color.gray(0.4))
+                #self._rebuild_trail()
+                for pt in self._trail_points:
+                    self.trail.append(pt)
+                self.trail.visible = True
             else:
                 self.trail.append(p)
 

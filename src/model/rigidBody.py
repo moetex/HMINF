@@ -90,6 +90,13 @@ class RigidBody:
         self.sync()
 
 
+    def set_state(self, x, q, v, w):
+        self.x = np.asarray(x, dtype=float)
+        self.q = np.asarray(q, dtype=float)
+        self.v = np.asarray(v, dtype=float)
+        self.w = np.asarray(w, dtype=float)
+        self.sync()
+
     """
     # Mathe Helfer-Methoden
     """
