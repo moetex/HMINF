@@ -89,12 +89,11 @@ class RigidBody:
 
         self.sync()
 
-
     def set_state(self, x, q, v, w):
-        self.x = np.asarray(x, dtype=float)
-        self.q = np.asarray(q, dtype=float)
-        self.v = np.asarray(v, dtype=float)
-        self.w = np.asarray(w, dtype=float)
+        self.x = np.array(x, dtype=float, copy=True)
+        self.q = Quaternion.normalize(np.array(q, dtype=float, copy=True))
+        self.v = np.array(v, dtype=float, copy=True)
+        self.w = np.array(w, dtype=float, copy=True)
         self.sync()
 
     """
@@ -110,9 +109,9 @@ class RigidBody:
     def pose(self) -> np.ndarray:
         return Transform.pose(self.x, self.q)
 
-    def sync(self):
+    def sync(self, sync_visual: bool = True):
         self.collider_handle.sync(self.pose())
-        if self.visual is not None:
+        if self.visual and self.visual is not None:
             self.visual.sync(self.x, self.q)
 
     #def sync_collider(self):
@@ -121,12 +120,12 @@ class RigidBody:
     #    if self.visual_sync:
     #        self.visual_sync(self)
 
-    def step(self, dt):
+    def step(self, dt, sync_visual: bool = True):
         self.x += self.v * dt
 
         dq = Quaternion.from_omega(self.w, dt)
         self.q = Quaternion.normalize(Quaternion.mul(dq, self.q))
-        self.sync()
+        self.sync(sync_visual=sync_visual)
 
     def vel_at_point(self, p_world):
         r = p_world - self.x

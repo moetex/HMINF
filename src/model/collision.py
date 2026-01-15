@@ -47,8 +47,8 @@ class ImpulseSolver:
             corr = (self.baumgarte * pen / inv_mass_sum) * n
             a.x -= a.inv_mass * corr
             b.x += b.inv_mass * corr
-            a.sync()
-            b.sync()
+            a.sync(sync_visual=False)
+            b.sync(sync_visual=False)
 
         # --- impulse at contact point ---
         p = contact.point
@@ -116,7 +116,7 @@ class ImpulseSolver:
 
         jt_unc = -np.dot(vrel, t) / denom_t
 
-        jt_max_static = mu_s * t
+        jt_max_static = mu_s * jn
 
         if abs(jt_unc) <= jt_max_static:
             # Haftreibung
