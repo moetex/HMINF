@@ -61,3 +61,4 @@ class PairLookup:
             return cls._pars[name]
         # Fallback (wenn Paar fehlt): moderate Standardwerte
         return PairProps(mu_s=0.4, mu_k=0.25, e=0.5)
+
