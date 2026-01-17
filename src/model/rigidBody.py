@@ -40,6 +40,21 @@ class RigidBody:
         self.material = material
         self.shape = shape
 
+        # Geometrie-Parameter speichern (für UI/Debug)
+        self.size_xyz_m = None
+        self.mesh_V_m = None
+        self.mesh_F = None
+
+        if shape == "box":
+            if size_xyz_m is None:
+                raise ValueError("shape='box' requires size_xyz_m")
+            self.size_xyz_m = np.array(size_xyz_m, dtype=float, copy=True)
+
+        elif shape == "mesh":
+            if mesh_V_m is None or mesh_F is None:
+                raise ValueError("shape='mesh' requires mesh_V_m and mesh_F")
+            self.mesh_V_m = np.array(mesh_V_m, dtype=float, copy=True)
+            self.mesh_F = np.array(mesh_F, dtype=np.int32, copy=True)
 
         #self.mass = float(mass)
         #self.inv_mass = 0.0 if self.mass <= 0 else 1.0 / self.mass
