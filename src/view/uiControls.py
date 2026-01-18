@@ -59,6 +59,11 @@ class UIStyleManager:
                 border-bottom: 2px solid #3498db;
                 padding-bottom: 6px;                
             }
+
+            .ui-slider {
+                margin-top: 5px !important;
+                margin-bottom: 15px !important;
+            }
             
             .control-label {
                 display: block;
@@ -115,11 +120,11 @@ class UIStyleManager:
                 margin: 5px 0 15px 0;
             }
             
-            .bnt-group {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
+            .btn-group {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
                 gap: 8px;
-                margin-top: 10px;
+                margin: 15px 0 !important;
             }
             
             .info-box {
@@ -132,22 +137,12 @@ class UIStyleManager:
                 color: #2c3e50;
             }
                
-            pre.text {
-                margin.top: auto;
-                white-space: normal;
-            }
-            
-            pre {
-                white-space: normal;
-            }
-            
-            element.style {
-                /* white-space: pre-line; */
-            }
             
             #glowscript div {
                 white-space: normal !important;
             }
+            
+            
             
         </style>
         """
@@ -197,7 +192,8 @@ class UISlider(UIComponent):
         super().__init__(scene_ref)
         self.config = config
         self.slider_widget = None
-        self.value_id = config.value_id or f"val_{id(self)}"
+        self.value_text = None
+        #self.value_id = config.value_id or f"val_{id(self)}"
         self._current_value = config.initial_val
 
     def render(self):
@@ -205,20 +201,21 @@ class UISlider(UIComponent):
         self.scene.append_to_caption(f"""
         <label class='control-label'>
             {self.config.label}
-            <span class='value-display' id='{self.value_id}'>
-                {self._format_value(self.config.initial_val)}
-            </span>
-            {self.config.unit}
         </label>
         """)
+
+        # Wert-Anzeige
+        self.value_text = wtext(text=f"{self._format_value(self.config.initial_val)} {self.config.unit}")
+
+        self.scene.append_to_caption("<br>")
 
         self.slider_widget = slider(
             min=self.config.min_val,
             max=self.config.max_val,
             value=self.config.initial_val,
             step=self.config.step,
-            bind=self._on_change,
-            canvas=self.scene   # TODO
+            bind=self._on_change
+            #,canvas=self.scene   # TODO
         )
 
         self.scene.append_to_caption("<br>")
@@ -229,16 +226,23 @@ class UISlider(UIComponent):
         self._current_value = evt.value
         self.update_display(evt.value)
 
-        if self.config.callback:
-            self.config.callback(evt.value)
+        if self.config.callback and self.enabled:
+            try:
+                self.config.callback(evt.value)
+            except Exception as e:
+                print(f"Fehler in Slider-Callback: {e}")
 
     def update_display(self, value: float):
         """Aktualisiert die Wert-Anzeige"""
-        self.scene.append_to_caption(f"""
-        <script>
-            document.getElementById('{self.value_id}').textContent = '{self._format_value(value)}');
-        </script>
-        """)
+        if self.value_text:
+            formatted = self._format_value(value)
+            self.value_text.text = f"{formatted} {self.config.unit}"
+
+        #self.scene.append_to_caption(f"""
+        #<script>
+        #    document.getElementById('{self.value_id}').textContent = '{self._format_value(value)}');
+        #</script>
+        #""")
 
     def _format_value(self, value: float) -> str:
         """Formatiert den Wert für die Anzeige"""
@@ -261,6 +265,9 @@ class UISlider(UIComponent):
             self._current_value = value
             self.update_display(value)
 
+    def set_enabled(self, enabled: bool):
+        """Aktiviert/Deaktiviert den Slider"""
+        super().set_enabled(enabled)
 
 class UICheckbox(UIComponent):
     """Checkbox-Komponente"""
@@ -344,9 +351,9 @@ class UIButton(UIComponent):
 
     def render(self):
         """Rendert den Button"""
-        self.scene.append_to_caption("<div class='bnt-group'>")
+        #self.scene.append_to_caption("<div class='bnt-group'>")
         self.button_widget = button(text=self.text, bind=self._on_click, canvas=self.scene) #TODO
-        self.scene.append_to_caption(f"</div>")
+        #self.scene.append_to_caption(f"</div>")
         return self
 
     def _on_click(self, evt):
@@ -471,7 +478,8 @@ class SimulationUIController:
         section = UISection(self.scene, "Simulation", "⚙️")
         section.begin()
 
-        self.scene.append_to_caption("<div class='btn-group'>")
+        #self.scene.append_to_caption("<div style='display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0;'>")
+        #self.scene.append_to_caption("<div class='btn-group'>")
 
         #Start/Pause Button
         self.run_button = section.add_button(
@@ -487,7 +495,7 @@ class SimulationUIController:
             "↺ Reset",
             callback=self.sim_controller.reset
         )
-        self.scene.append_to_caption("</div>")
+        self.scene.append_to_caption("<br><br>")
 
         section.end()
         self.sections['control'] = section
@@ -524,28 +532,42 @@ class SimulationUIController:
         # Damping Slider
 
         # Mesh Speed Slider
-        self.mesh_speed_slider = section.add_slider(SliderConfig(
-            label="Geschw. Mesh",
-            min_val=0.0,
-            max_val=2.0,
-            initial_val=1.0,
-            step=0.01,
-            unit="x",
-            value_id="mesh-speed-val",
-            callback=self.sim_controller.set_mesh_speed
-        ))
+        #self.scene.append_to_caption("<div style='margin: 10px 0;'>")
+        mesh_speed_label = wtext(text="Geschw. Mesh: ")
+        mesh_speed_value = wtext(text=f"{1.0:.1f}x")
+        self.scene.append_to_caption("<br>")
 
-        # Mesh Speed Slider
-        self.cube_speed_slider = section.add_slider(SliderConfig(
-            label="Geschw. Cube",
-            min_val=0.0,
-            max_val=2.0,
-            initial_val=1.0,
+        self.mesh_speed_slider = slider( #section.add_slider(SliderConfig(
+            #label="Geschw. Mesh",
+            min=0.0,
+            max=2.0,
+            value=1.0,
             step=0.01,
-            unit="x",
-            value_id="cube-speed-val",
-            callback=self.sim_controller.set_cube_speed
-        ))
+            #unit="x",
+            #value_id="mesh-speed-val",
+            #callback=self.sim_controller.set_mesh_speed
+            bind=lambda s: self._update_mesh_speed(s, mesh_speed_value)
+        )
+        #self.scene.append_to_caption("</div>")
+
+        # Cube Speed Slider
+        #self.scene.append_to_caption("<div style='margin: 10px 0;'>")
+        cube_speed_label = wtext(text="<br>Geschw. Cube: ")
+        cube_speed_value = wtext(text=f"{1.0:.1f}x")
+        self.scene.append_to_caption("<br>")
+
+        self.cube_speed_slider = slider( #section.add_slider(SliderConfig(
+            #label="Geschw. Cube",
+            min=0.0,
+            max=2.0,
+            value=1.0,
+            step=0.01,
+            #unit="x",
+            #value_id="cube-speed-val",
+            #callback=self.sim_controller.set_cube_speed
+            bind=lambda s: self._update_cube_speed(s, cube_speed_value)
+        )
+        #self.scene.append_to_caption("</div>")
 
         section.end()
         self.sections['parameter'] = section
@@ -591,11 +613,23 @@ class SimulationUIController:
 
     def lock_speed_sliders(self, locked: bool):
         """Sperrt/Entsperrt die Geschwindigkeits-Slider"""
-        if self.mesh_speed_slider:
-            self.mesh_speed_slider.set_enabled(not locked)
-        if self.cube_speed_slider:
-            self.cube_speed_slider.set_enabled(not locked)
+        #if self.mesh_speed_slider:
+        #    self.mesh_speed_slider.set_enabled(not locked)
+        #if self.cube_speed_slider:
+        #    self.cube_speed_slider.set_enabled(not locked)
+        pass
 
+    def _update_mesh_speed(self, s, value_weight):
+        """Update Mesh Speed"""
+        value_weight.text = f"{s.value:.1f}"
+        if hasattr(self.sim_controller, "set_mesh_speed"):
+            self.sim_controller.set_mesh_speed(s.value)
+
+    def _update_cube_speed(self, s, value_weight):
+        """Update Mesh Speed"""
+        value_weight.text = f"{s.value:.1f}"
+        if hasattr(self.sim_controller, "set_cube_speed"):
+            self.sim_controller.set_cube_speed(s.value)
 
 # ----------------------------------------
 # Integration Helper

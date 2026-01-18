@@ -81,6 +81,19 @@ class Simulation:
         # Initial Debug-System
         self._sync_debug_view()
 
+        # Basis-Zustände
+        #self._base_init_mesh = (x0, q0, v0_base, w0)
+        #self._base_init_cube = (x0, q0, v0_base, w0)
+
+        # Aktuelle Zustände
+        #self._init_mesh = (x0, q0, v0_base * 1.0, w0)
+        #self._init_cube = (x0, q0, v0_base * 1.0, w0)
+
+        # Speed-Faktoren
+        self.mesh_speed_factor = 1.0
+        self.cube_speed_factor = 1.0
+
+
 
     # ----------------------------------------
     # Bodies erstellen
@@ -212,12 +225,27 @@ class Simulation:
     def reset(self):
         """Reset Simulation"""
         # Mesh zurücksetzen
-        x, q, v, w = self._base_init_mesh
-        self.body_mesh.set_state(x, q, v, w)
+        x0_mesh, q0_mesh, v0_mesh, w0_mesh = self._base_init_mesh
+        #self.body_mesh.set_state(x, q, v, w)
 
         # Cube zurücksetzen
-        x, q, v, w = self._base_init_cube
-        self.body_cube.set_state(x, q, v, w)
+        x0_cube, q0_cube, v0_cube, w0_cube = self._base_init_cube
+        #self.body_cube.set_state(x, q, v, w)
+
+        # Aktuelle Geschwindigkeit mit Faktoren
+        v_mesh = v0_mesh * self.mesh_speed_factor
+        v_cube = v0_cube * self.cube_speed_factor
+
+        # Mesh zurücksetzen
+        self.body_mesh.set_state(x0_mesh, q0_mesh, v_mesh, w0_mesh)
+
+        # Cube zurücksetzen
+        self.body_cube.set_state(x0_cube, q0_cube, v_cube, w0_cube)
+
+        # Aktualisierten Wert für Reset speichern
+        self._init_mesh = (x0_mesh.copy(), q0_mesh.copy(), v_mesh.copy(), w0_mesh.copy())
+        self._init_cube = (x0_cube.copy(), q0_cube.copy(), v_cube.copy(), w0_cube.copy())
+
 
         # View zurücksetzen
         self.contact_view.reset()
@@ -272,9 +300,9 @@ class Simulation:
 
     def set_mesh_speed(self, factor: float):
         """Setzt Geschwindigkeitsfaktor für Mesh"""
-        if self.has_started:
-            #s.value = self.mesh_speed_factor
-            return          # nicht während Simulation änderbar
+        #if self.has_started:
+        #    #s.value = self.mesh_speed_factor
+        #    return          # nicht während Simulation änderbar
 
         self.mesh_speed_factor = float(factor)
         #self.mesh_speed_label.text = f"{self.mesh_speed_factor:.2f}  "
@@ -282,19 +310,25 @@ class Simulation:
         x0, q0, v0, w0 = self._base_init_mesh
         new_v = v0 * self.mesh_speed_factor
 
-        # Aktuellen Body updaten (vor Start direkt sichtbar)
-        self.body_mesh.v = new_v.copy()
+        # Nur wenn Simulation noch nicht gestartet
+        if not self.has_started:
 
-        # Reset-Zielwerte updaten (damit Reset wieder korrekt ist)
-        self._init_mesh = (x0.copy(), q0.copy(), new_v.copy(), w0.copy())
+            # Aktuellen Body updaten (vor Start direkt sichtbar)
+            self.body_mesh.v = new_v.copy()
 
-        # Pfeile/Debug sofort aktualisieren
-        self.mesh_frame_view.sync(self.body_mesh)
+            # Reset-Zielwerte updaten (damit Reset wieder korrekt ist)
+            self._init_mesh = (x0.copy(), q0.copy(), new_v.copy(), w0.copy())
+
+            # Pfeile/Debug sofort aktualisieren
+            self.mesh_frame_view.sync(self.body_mesh)
+        else:
+            # Wenn bereits gestartet, nur für nächsten reset speichern
+            self._init_mesh = (self._init_mesh[0], self._init_mesh[1], self._init_mesh[2], self._init_mesh[3])
 
     def set_cube_speed(self, factor: float):
-        if self.has_started:
-            #s.value = self.cube_speed_factor
-            return
+        #if self.has_started:
+        #    #s.value = self.cube_speed_factor
+        #    return
 
         self.cube_speed_factor = float(factor)
         #self.cube_speed_label.text = f"{self.cube_speed_factor:.2f}  "
@@ -302,10 +336,13 @@ class Simulation:
         x0, q0, v0, w0 = self._base_init_cube
         new_v = v0 * self.cube_speed_factor
 
-        self.body_cube.v = new_v.copy()
-        self._init_cube = (x0.copy(), q0.copy(), new_v.copy(), w0.copy())
+        if not self.has_started:
+            self.body_cube.v = new_v.copy()
+            self._init_cube = (x0.copy(), q0.copy(), new_v.copy(), w0.copy())
 
-        self.cube_frame_view.sync(self.body_cube)
+            self.cube_frame_view.sync(self.body_cube)
+        else:
+            self._init_cube = (self._init_cube[0], self._init_cube[1], self._init_cube[2], self._init_cube[3])
 
     def toggle_arrows(self, checked: bool):
         """Toggle Freiheitsgrad-Visualiserung"""
