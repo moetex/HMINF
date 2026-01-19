@@ -41,8 +41,19 @@ class PairProps:
 
 class MaterialLibrary:
     """verwaltet vordefinierte Materialien"""
-    STAHL = Material("Stahl", 7850.0)
-    HOLZ = Material("Holz", 425.0)
+    #STAHL = Material("Stahl", 7850.0)
+    #HOLZ = Material("Holz", 425.0)
+
+    MATERIALS = {
+        'Holz': Material("Holz", 425.0),
+        'Stahl': Material("Stahl", 785.0),
+
+    }
+
+    @classmethod
+    def get(cls, name: str) -> Material:
+        """Gibt Material anhand des Namens zurück"""
+        return cls.MATERIALS.get(name, cls.MATERIALS["Stahl"])
 
 
 
@@ -61,4 +72,3 @@ class PairLookup:
             return cls._pars[name]
         # Fallback (wenn Paar fehlt): moderate Standardwerte
         return PairProps(mu_s=0.4, mu_k=0.25, e=0.5)
-

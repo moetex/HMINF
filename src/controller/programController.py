@@ -10,6 +10,7 @@ from src.model.collision import CollisionDetector, ImpulseSolver
 from src.model.rigidBody import RigidBody, inertia_box
 
 from src.model.stlMesh import STLMesh
+from src.view.uiControls import VPythonSceneBuilder, SimulationUIController
 from src.view.visualsVPython import BoxWireframe, VpythonTriangleMeshView, VpythonBoxVisual, ContactDebugView, \
     BodyFrameDebugView
 
@@ -22,65 +23,422 @@ from vpython import (
 
 
 class Simulation:
-    def set_mesh_speed(self, s):
-        # Nach dem ersten Start gesperrt
-        if self.has_started:
-            s.value = self.mesh_speed_factor
-            return
-
-        self.mesh_speed_factor = float(s.value)
-        self.mesh_speed_label.text = f"{self.mesh_speed_factor:.2f}  "
-
-        x0, q0, v0, w0 = self._base_init_mesh
-        new_v = v0 * self.mesh_speed_factor
-
-        # Aktuellen Body updaten (vor Start direkt sichtbar)
-        self.body_mesh.v = new_v.copy()
-
-        # Reset-Zielwerte updaten (damit Reset wieder korrekt ist)
-        self._init_mesh = (x0.copy(), q0.copy(), new_v.copy(), w0.copy())
-
-        # Pfeile/Debug sofort aktualisieren
-        self.mesh_frame_view.sync(self.body_mesh)
-
-    def set_cube_speed(self, s):
-        if self.has_started:
-            s.value = self.cube_speed_factor
-            return
-
-        self.cube_speed_factor = float(s.value)
-        self.cube_speed_label.text = f"{self.cube_speed_factor:.2f}  "
-
-        x0, q0, v0, w0 = self._base_init_cube
-        new_v = v0 * self.cube_speed_factor
-
-        self.body_cube.v = new_v.copy()
-        self._init_cube = (x0.copy(), q0.copy(), new_v.copy(), w0.copy())
-
-        self.cube_frame_view.sync(self.body_cube)
 
     def __init__(self, stl_path: str):
-
+        # Physik-Parameter
         self.dt = 1.0 / 240.0   # 120
         self.solver_iters = 10    #8
         self.damping = 1.0 #0.9995
 
+        # Container/Welt
         self.container_size = 0.3   # 80cm
         self.wall_thickness = 0.01   # 1cm
         self.world = BoxWorld(half_size=self.container_size / 2.0,
                               wall_thickness=self.wall_thickness,
-                              wall_material=MaterialLibrary.HOLZ)
-
+                              #wall_material=MaterialLibrary.HOLZ
+                              wall_material=MaterialLibrary.MATERIALS.get("Holz") #TODO
+        )
+        # Simulation-Status
         self.running = False  # startet NICHT automatisch
         self.has_started = False  # damit Button zuerst "Start" zeigt
         self.show_settings = False
         self.mesh_speed_factor = 1.0
         self.cube_speed_factor = 1.0
 
-        scene = canvas(title="STL Mesh + Cube in a closed Box", width=1100, height=800, background=color.white)
-        #scene.center = vector(0, 0, 0)
-        scene.range = 0.25
 
+        # VPython Szene erstellen
+        self.scene = VPythonSceneBuilder.create_scene(
+            title="Simulation - Kollision nicht trivialer Objekte",
+            width=1100,
+            height=800
+        )
+        # scene = canvas(title="STL Mesh + Cube in a closed Box", width=1100, height=800, background=color.white)
+        # scene.range = 0.25
+
+        # UI Controller erstellen
+        self.ui_controller = SimulationUIController(self.scene, self)
+
+        # Box-Wireframe zeichnen
+        BoxWireframe.draw(self.world.half)
+
+        # Bodies erstellen
+        self._create_mesh_body(stl_path)
+        self._create_cube_body()
+
+        # Collision Detection & Solver
+        self.detector = CollisionDetector
+        self.solver = ImpulseSolver(slop=1e-4, baumgarte=0.2)
+
+        # Debug-Visualisierung
+        self._create_debug_view()
+
+        # Kontakt-Tracking
+        self._contacts_this_frame = []
+
+        # Initiale Zustände speichern
+        self._store_initial_states()
+
+        # Initial Debug-System
+        self._sync_debug_view()
+
+        # Basis-Zustände
+        #self._base_init_mesh = (x0, q0, v0_base, w0)
+        #self._base_init_cube = (x0, q0, v0_base, w0)
+
+        # Aktuelle Zustände
+        #self._init_mesh = (x0, q0, v0_base * 1.0, w0)
+        #self._init_cube = (x0, q0, v0_base * 1.0, w0)
+
+        # Speed-Faktoren
+        self.mesh_speed_factor = 1.0
+        self.cube_speed_factor = 1.0
+
+
+
+    # ----------------------------------------
+    # Bodies erstellen
+    # ----------------------------------------
+
+    def _create_mesh_body(self, stl_path: str):
+        """Erstellt den Mesh-Body aus STL-Datei"""
+        # Mesh laden & verarbeiten
+        mesh_raw = STLMesh.load(stl_path).centered()  # in mm
+
+        # Visualisierungs-Mesh
+        tm_vis = trimesh.Trimesh(vertices=mesh_raw.V, faces=mesh_raw.F, process=False)
+        tm_vis_s = tm_vis.simplify_quadric_decimation(face_count=3000)  # 3000 Faces als Startwert
+        mesh_vis_m = STLMesh(tm_vis_s.vertices * 1e-3, tm_vis_s.faces)
+
+        # Physik-Mesh (konvexe Hülle)
+        mesh_phys = mesh_raw.convex_hull()
+        V_m = mesh_phys.V * 1e-3  # mm -> m
+
+        # Collider und Visual erstellen
+        mesh_collider = ColliderHandle(lambda T: colliders.MeshGraph(T, V_m, mesh_phys.F))
+        mesh_visual = VpythonTriangleMeshView(mesh_vis_m, mesh_color=color.orange)
+
+        # Starrkörper erstellen
+        self.body_mesh = RigidBody(
+            #material=MaterialLibrary.HOLZ, # TODO
+            material=MaterialLibrary.MATERIALS.get("Holz"),
+            shape="mesh",
+            mesh_V_m=V_m,
+            mesh_F=mesh_phys.F,
+            x=[-0.10, 0, 0],  # meter ; [-20, 0, 0]
+            q=[1, 0, 0, 0],
+            v=[0.50, 0.06, 0.18],  # m/s ; [30, 6, 18]
+            w=[1.2, 0.4, 0.9],  # rad/s ; [1.2, 0.4, 0.9]
+            collider=mesh_collider,
+            visual=mesh_visual
+        )
+
+    def _create_cube_body(self):
+        """Erstellt den Würfel-Body"""
+        cube_size = np.array([0.05, 0.05, 0.05], dtype=float)
+        cube_collider = ColliderHandle(lambda T: colliders.Box(T, cube_size))
+        cube_visual = VpythonBoxVisual(cube_size, color_=color.gray(0.7), opacity=0.9)
+
+        # Starrkörper erstellen
+        self.body_cube = RigidBody(
+            #material=MaterialLibrary.STAHL,    # TODO
+            material=MaterialLibrary.MATERIALS.get("Stahl"),
+            shape="box",
+            size_xyz_m=cube_size,  # 2cm
+            x=[0.10, 0.0, 0.0],
+            q=[1, 0, 0, 0],
+            v=[-0.86, -0.08, 0.10],
+            w=[0.7, 1.6, 0.3],
+            collider=cube_collider,
+            visual=cube_visual
+        )
+
+    def _create_debug_view(self):
+        """Erstellt Debug-Visualisierung"""
+        self.contact_view = ContactDebugView(
+            max_points=64,
+            point_radius=0.006,
+            normal_scale=0.04
+        )
+
+        self.mesh_frame_view = BodyFrameDebugView(
+            axis_len=0.06,
+            show_v_dir=True,
+            show_w_dir=True,
+            v_len=0.05,
+            w_len=0.06,
+            show_trail=True
+        )
+
+        self.cube_frame_view = BodyFrameDebugView(
+            axis_len=0.06,
+            show_v_dir=True,
+            show_w_dir=True,
+            v_len=0.05,
+            w_len=0.06,
+            show_trail=True
+        )
+
+    def _store_initial_states(self):
+        """Speichert initiale Zustände, für Reset"""
+        self._init_cube = (
+            self.body_cube.x.copy(),
+            self.body_cube.q.copy(),
+            self.body_cube.v.copy(),
+            self.body_cube.w.copy()
+        )
+
+        self._init_mesh = (
+            self.body_mesh.x.copy(),
+            self.body_mesh.q.copy(),
+            self.body_mesh.v.copy(),
+            self.body_mesh.w.copy()
+        )
+
+        # Basiszustände, für Speed-Slider
+        self._base_init_mesh = tuple(arr.copy() for arr in self._init_mesh)
+        self._base_init_cube = tuple(arr.copy() for arr in self._init_cube)
+
+    def _sync_debug_view(self):
+        """Synchronisiert Debug-Views"""
+        self.mesh_frame_view.sync(self.body_mesh)
+        self.cube_frame_view.sync(self.body_cube)
+        self.contact_view.clear()
+
+    # ----------------------------------------
+    # UI Callbacks
+    # ----------------------------------------
+
+    def toggle_run(self):
+        """Start/Pause Toggle"""
+        if not self.has_started:
+            # Erstes Starten
+            self.has_started = True
+            self.running = True
+            self.ui_controller.update_run_button(True)
+            self.ui_controller.lock_speed_sliders(True)
+        else:
+            # Normal togglen
+            self.running = not self.running
+            self.ui_controller.update_run_button(self.running)
+
+
+    def reset(self):
+        """Reset Simulation"""
+        # Mesh zurücksetzen
+        x0_mesh, q0_mesh, v0_mesh, w0_mesh = self._base_init_mesh
+        #self.body_mesh.set_state(x, q, v, w)
+
+        # Cube zurücksetzen
+        x0_cube, q0_cube, v0_cube, w0_cube = self._base_init_cube
+        #self.body_cube.set_state(x, q, v, w)
+
+        # Aktuelle Geschwindigkeit mit Faktoren
+        v_mesh = v0_mesh * self.mesh_speed_factor
+        v_cube = v0_cube * self.cube_speed_factor
+
+        # Mesh zurücksetzen
+        self.body_mesh.set_state(x0_mesh, q0_mesh, v_mesh, w0_mesh)
+
+        # Cube zurücksetzen
+        self.body_cube.set_state(x0_cube, q0_cube, v_cube, w0_cube)
+
+        # Aktualisierten Wert für Reset speichern
+        self._init_mesh = (x0_mesh.copy(), q0_mesh.copy(), v_mesh.copy(), w0_mesh.copy())
+        self._init_cube = (x0_cube.copy(), q0_cube.copy(), v_cube.copy(), w0_cube.copy())
+
+
+        # View zurücksetzen
+        self.contact_view.reset()
+        self.mesh_frame_view.reset_trail()
+        self.cube_frame_view.reset_trail()
+
+        self._contacts_this_frame = []
+        self._sync_debug_view()
+
+        # Status zurücksetzen
+        self.running = False
+        self.has_started = False
+        self.ui_controller.update_run_button(False)
+        self.ui_controller.lock_speed_sliders(False)
+
+    def change_mesh_material(self, material_name: str):
+        """Ändert das Material des Mesh-Bodies"""
+        if self.has_started:
+            return      # nicht während Simulation änderbar
+
+        #new_material = MaterialLibary.get(material_name)
+        new_material = MaterialLibrary.get(material_name)   # TODO
+        print("change_mesh_material: " + new_material.name)
+
+        # Neuberechnung der physikalischen Eigenschaften
+        old_mass = self.body_mesh.mass
+        self.body_mesh.material = new_material
+
+        # Masse neu berechnen (Volumen bleibt gleich)
+        if hasattr(self.body_mesh, "volume_m3"):
+            self.body_mesh.mass = new_material.density * self.body_mesh.volume_m3
+            self.body_mesh.inv_mass = 1.0 / self.body_mesh.mass if self.body_mesh.mass > 0 else 0.0
+
+        print(f"Mesh Material {material_name} (Masse: {self.body_mesh.mass:.3f} kg)")
+
+    def change_cube_material(self, material_name: str):
+        """Ändert das Material des Würfel-Bodies"""
+        if self.has_started:
+            return
+
+        new_material = MaterialLibrary.get(material_name)   # TODO
+        print("change_cube_material: " + new_material.name)
+
+        old_mass = self.body_cube.mass
+        self.body_cube.material = new_material
+
+        if hasattr(self.body_cube, "volume_m3"):
+            self.body_cube.mass = new_material.density * self.body_cube.volume_m3
+            self.body_cube.inv_mass = 1.0 / self.body_cube.mass if self.body_cube.mass > 0 else 0.0
+
+        print(f"Cube Material: {material_name} (Masse: {self.body_cube.mass:.3f} kg)")
+
+    def set_mesh_speed(self, factor: float):
+        """Setzt Geschwindigkeitsfaktor für Mesh"""
+        #if self.has_started:
+        #    #s.value = self.mesh_speed_factor
+        #    return          # nicht während Simulation änderbar
+
+        self.mesh_speed_factor = float(factor)
+        #self.mesh_speed_label.text = f"{self.mesh_speed_factor:.2f}  "
+
+        x0, q0, v0, w0 = self._base_init_mesh
+        new_v = v0 * self.mesh_speed_factor
+
+        # Nur wenn Simulation noch nicht gestartet
+        if not self.has_started:
+
+            # Aktuellen Body updaten (vor Start direkt sichtbar)
+            self.body_mesh.v = new_v.copy()
+
+            # Reset-Zielwerte updaten (damit Reset wieder korrekt ist)
+            self._init_mesh = (x0.copy(), q0.copy(), new_v.copy(), w0.copy())
+
+            # Pfeile/Debug sofort aktualisieren
+            self.mesh_frame_view.sync(self.body_mesh)
+        else:
+            # Wenn bereits gestartet, nur für nächsten reset speichern
+            self._init_mesh = (self._init_mesh[0], self._init_mesh[1], self._init_mesh[2], self._init_mesh[3])
+
+    def set_cube_speed(self, factor: float):
+        #if self.has_started:
+        #    #s.value = self.cube_speed_factor
+        #    return
+
+        self.cube_speed_factor = float(factor)
+        #self.cube_speed_label.text = f"{self.cube_speed_factor:.2f}  "
+
+        x0, q0, v0, w0 = self._base_init_cube
+        new_v = v0 * self.cube_speed_factor
+
+        if not self.has_started:
+            self.body_cube.v = new_v.copy()
+            self._init_cube = (x0.copy(), q0.copy(), new_v.copy(), w0.copy())
+
+            self.cube_frame_view.sync(self.body_cube)
+        else:
+            self._init_cube = (self._init_cube[0], self._init_cube[1], self._init_cube[2], self._init_cube[3])
+
+    def toggle_arrows(self, checked: bool):
+        """Toggle Freiheitsgrad-Visualiserung"""
+        self.mesh_frame_view.set_gizmo_visible(checked)
+        self.cube_frame_view.set_gizmo_visible(checked)
+
+    def toggle_contacts(self, checked: bool):
+        """Toggle Kontaktpunkt-Visualisierung"""
+        self.contact_view.set_visible(checked)
+
+    def toggle_trail(self, checked: bool):
+        """Toggle Bewegungsspur"""
+        self.mesh_frame_view.set_trail_visible(checked)
+        self.cube_frame_view.set_trail_visible(checked)
+
+
+    # ----------------------------------------
+    # Simulation Logik
+    # ----------------------------------------
+
+    def _store_contacts(self, c):
+        """Speichert Kontaktpunkt-Informationen"""
+        p = np.asarray(c.point, float)
+        n = np.asarray(c.normal, float)
+        self._contacts_this_frame.append((p, n))
+
+    def _solve_contacts(self):
+        """Löst alle Kollisionen"""
+        # body vs box
+        for w in self.world.walls:
+            c = self.detector.detect(self.body_mesh, w)
+            if c:
+                self._store_contacts(c)
+                self.solver.resolve(self.body_mesh, w, c)
+
+            c = self.detector.detect(self.body_cube, w)
+            if c:
+                self._store_contacts(c)
+                self.solver.resolve(self.body_cube, w, c)
+
+        # body vs body
+        c = self.detector.detect(self.body_mesh, self.body_cube)
+        if c:
+            self._store_contacts(c)
+            self.solver.resolve(self.body_mesh, self.body_cube, c)
+
+    def step(self, sync_visual: bool = True):
+        self._contacts_this_frame = []
+        #self._contacts_this_frame.clear()
+
+        self.body_mesh.step(self.dt, sync_visual=sync_visual)
+        self.body_cube.step(self.dt, sync_visual=sync_visual)
+
+        for _ in range(self.solver_iters):
+            self._solve_contacts()
+
+        for b in (self.body_mesh, self.body_cube):
+            b.v *= self.damping
+            b.w *= self.damping
+
+        # Kontaktpunkte anzeigen
+        for p, n in self._contacts_this_frame[: self.contact_view.max_points]:
+            self.contact_view.add(p, n)
+
+    def _draw_debug(self):
+        # Kontaktpunkte anzeigen
+        self.contact_view.clear()
+        for p, n in self._contacts_this_frame[: self.contact_view.max_points]:
+            self.contact_view.add(p, n)
+
+        # Freiheitsgrade
+        self.mesh_frame_view.sync(self.body_mesh)
+        self.cube_frame_view.sync(self.body_cube)
+
+
+    def run(self):
+        """Haupt-Simulationsschleife"""
+        render_hz = 60
+        substeps = int(round((1.0 / render_hz) / self.dt))  # dt=1/240 => 4
+
+        while True:
+            rate(render_hz)
+
+            if self.running:
+                for _ in range(substeps):
+                    self.step(sync_visual=False)  # Physik + Collider, aber ohne Mesh-Vertex-Updates
+
+                # EINMAL pro Frame Visuals + Debug zeichnen:
+                self.body_mesh.sync(sync_visual=True)
+                self.body_cube.sync(sync_visual=True)
+                self._draw_debug()
+
+
+
+
+    """
         scene.append_to_caption("\n")
         self.run_btn = button(text="Start", bind=self.toggle_run)
         #scene.append_to_caption("\t")
@@ -185,37 +543,7 @@ class Simulation:
 
         BoxWireframe.draw(self.world.half)
 
-        mesh_raw = STLMesh.load(stl_path).centered()    # in mm
-        tm_vis = trimesh.Trimesh(vertices=mesh_raw.V, faces=mesh_raw.F, process=False)
-        tm_vis_s = tm_vis.simplify_quadric_decimation(face_count=3000)  # 3000 Faces als Startwert
-        mesh_vis_m = STLMesh(tm_vis_s.vertices * 1e-3, tm_vis_s.faces)
-
-        mesh_phys = mesh_raw.convex_hull()
-        V_m = mesh_phys.V * 1e-3                 # mm -> m
-
-        #mesh_vis = STLMesh.load(stl_path).centered().scaled_to_radius(18.0) #18.0 Visualisierung frei skalierbar
-        #mesh_phys = STLMesh.load(stl_path).convex_hull().centered() #.scaled_to_radius(24.0)  #18.0
-        #V_m = mesh_phys.V * 1e-3    # mm -> m
-
-
-        #mesh_mass = 2.0
-        #mesh_I = rigidBody.inertia_box(mesh_mass, mesh_phys.extents())
-
-        mesh_collider = ColliderHandle(lambda T: colliders.MeshGraph(T, V_m, mesh_phys.F))
-        mesh_visual = VpythonTriangleMeshView(mesh_vis_m, mesh_color=color.orange)
-        self.body_mesh = RigidBody(
-            material=MaterialLibrary.HOLZ,
-            shape="mesh",
-            mesh_V_m=V_m,
-            mesh_F=mesh_phys.F,
-            x=[-0.10, 0, 0],    # meter ; [-20, 0, 0]
-            q=[1, 0, 0, 0],
-            v=[0.50, 0.06, 0.18],      # m/s ; [30, 6, 18]
-            w=[1.2, 0.4, 0.9],  # rad/s ; [1.2, 0.4, 0.9]
-            collider=mesh_collider,
-            visual=mesh_visual
-        )
-
+        
 
         self.mesh_speed_factor = 1.0
         self.cube_speed_factor = 1.0
@@ -224,23 +552,9 @@ class Simulation:
 
         #cube_mass = 1.5
         #cube_I = inertia_box(cube_mass, cube_size)
-        cube_size = np.array([0.05, 0.05, 0.05], dtype=float)
-        cube_collider = ColliderHandle(lambda T: colliders.Box(T, cube_size))
-        cube_visual = VpythonBoxVisual(cube_size, color_=color.gray(0.7), opacity=0.9)
-        self.body_cube = RigidBody(
-            material=MaterialLibrary.STAHL,
-            shape="box",
-            size_xyz_m=cube_size,    # 2cm
-            x=[0.10, 0.0, 0.0],
-            q=[1, 0, 0, 0],
-            v=[-0.86, -0.08, 0.10],
-            w=[0.7, 1.6, 0.3],
-            collider=cube_collider,
-            visual=cube_visual
-        )
-        self._init_cube = (self.body_cube.x.copy(), self.body_cube.q.copy(), self.body_cube.v.copy(), self.body_cube.w.copy())
-        self._init_mesh = (self.body_mesh.x.copy(), self.body_mesh.q.copy(), self.body_mesh.v.copy(),
-                           self.body_mesh.w.copy())
+        
+        
+        
 
         # --- Speed-Slider Basiswerte (werden nur VOR dem Start verändert) ---
         self._base_init_mesh = (self._init_mesh[0].copy(), self._init_mesh[1].copy(), self._init_mesh[2].copy(),
@@ -252,9 +566,7 @@ class Simulation:
         self.solver = ImpulseSolver(slop=1e-4, baumgarte=0.2)
 
 
-        self.contact_view = ContactDebugView(max_points=64, point_radius=0.006, normal_scale=0.04)  # 0.004, 0.06
-        self.mesh_frame_view = BodyFrameDebugView(axis_len=0.06, show_v_dir=True, show_w_dir=True, v_len=0.05, w_len=0.06, show_trail=True)
-        self.cube_frame_view = BodyFrameDebugView(axis_len=0.06, show_v_dir=True, show_w_dir=True, v_len=0.05, w_len=0.06, show_trail=True)
+
 
         self._contacts_this_frame = []
 
@@ -265,75 +577,9 @@ class Simulation:
 
         # optional: Kontaktanzeige initial leeren
         self.contact_view.clear()
+    
 
-
-    def _store_contacts(self, c):
-        p = np.asarray(c.point, float)
-        n = np.asarray(c.normal, float)
-        self._contacts_this_frame.append((p, n))
-
-
-    def _solve_contacts(self):
-        # body vs box
-        for w in self.world.walls:
-            c = self.detector.detect(self.body_mesh, w)
-            if c:
-                self._store_contacts(c)
-                self.solver.resolve(self.body_mesh, w, c)
-
-            c = self.detector.detect(self.body_cube, w)
-            if c:
-                self._store_contacts(c)
-                self.solver.resolve(self.body_cube, w, c)
-
-        # body vs body
-        c = self.detector.detect(self.body_mesh, self.body_cube)
-        if c:
-            self._store_contacts(c)
-            self.solver.resolve(self.body_mesh, self.body_cube, c)
-
-    def step(self, sync_visual: bool = True):
-        self._contacts_this_frame = []
-        #self._contacts_this_frame.clear()
-
-        self.body_mesh.step(self.dt, sync_visual=sync_visual)
-        self.body_cube.step(self.dt, sync_visual=sync_visual)
-
-        for _ in range(self.solver_iters):
-            self._solve_contacts()
-
-        for b in (self.body_mesh, self.body_cube):
-            b.v *= self.damping
-            b.w *= self.damping
-
-        # Kontaktpunkte anzeigen
-        for p, n in self._contacts_this_frame[: self.contact_view.max_points]:
-            self.contact_view.add(p, n)
-
-    def _draw_debug(self):
-        # Kontaktpunkte anzeigen
-        self.contact_view.clear()
-        for p, n in self._contacts_this_frame[: self.contact_view.max_points]:
-            self.contact_view.add(p, n)
-
-        # Freiheitsgrade
-        self.mesh_frame_view.sync(self.body_mesh)
-        self.cube_frame_view.sync(self.body_cube)
-
-    def run(self):
-        render_hz = 60
-        substeps = int(round((1.0 / render_hz) / self.dt))  # dt=1/240 => 4
-
-        while True:
-            rate(render_hz)
-            if self.running:
-                for _ in range(substeps):
-                    self.step(sync_visual=False)  # Physik + Collider, aber ohne Mesh-Vertex-Updates
-                # EINMAL pro Frame Visuals + Debug zeichnen:
-                self.body_mesh.sync(sync_visual=True)
-                self.body_cube.sync(sync_visual=True)
-                self._draw_debug()
-
+    
     def toggle_run(self, b):
         # Erstes Starten
         if not self.has_started:
@@ -431,3 +677,5 @@ class Simulation:
     def toggle_trail(self, checked: bool):
         self.mesh_frame_view.set_trail_visible(checked)
         self.cube_frame_view.set_trail_visible(checked)
+    
+    """
