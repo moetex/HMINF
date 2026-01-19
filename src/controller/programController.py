@@ -106,7 +106,7 @@ class Simulation:
 
         # Visualisierungs-Mesh
         tm_vis = trimesh.Trimesh(vertices=mesh_raw.V, faces=mesh_raw.F, process=False)
-        tm_vis_s = tm_vis.simplify_quadric_decimation(face_count=3000)  # 3000 Faces als Startwert
+        tm_vis_s = tm_vis.simplify_quadric_decimation(face_count=1000)  # 1000 Faces als Startwert
         mesh_vis_m = STLMesh(tm_vis_s.vertices * 1e-3, tm_vis_s.faces)
 
         # Physik-Mesh (konvexe Hülle)
@@ -391,13 +391,26 @@ class Simulation:
 
     def step(self, sync_visual: bool = True):
         self._contacts_this_frame = []
-        #self._contacts_this_frame.clear()
-
         self.body_mesh.step(self.dt, sync_visual=sync_visual)
         self.body_cube.step(self.dt, sync_visual=sync_visual)
+        active_contacts = []
+        
+        for w in self.world.walls:
+            c = self.detector.detect(self.body_mesh, w)
+            if c: active_contacts.append((self.body_mesh, w, c))
+            
+            c = self.detector.detect(self.body_cube, w)
+            if c: active_contacts.append((self.body_cube, w, c))
+
+        c = self.detector.detect(self.body_mesh, self.body_cube)
+        if c: active_contacts.append((self.body_mesh, self.body_cube, c))
+
+        for _, _, c in active_contacts:
+            self._store_contacts(c)
 
         for _ in range(self.solver_iters):
-            self._solve_contacts()
+            for body_a, body_b, contact in active_contacts:
+                self.solver.resolve(body_a, body_b, contact)
 
         for b in (self.body_mesh, self.body_cube):
             b.v *= self.damping

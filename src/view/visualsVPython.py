@@ -5,25 +5,40 @@ from vpython import (
     box as vp_box, curve
 )
 
-
 from src.model import stlMesh
 from src.res.MathHelpers import Quaternion
 
+from vpython import compound, vector, vertex, triangle, color
 
 class VpythonTriangleMeshView:
     """Renders a triangle mesh (V, F). Updates by applying R,p to base vertices."""
     def __init__(self, mesh: stlMesh, mesh_color=color.gray(0.75)):
-        self.base = mesh.V.copy()
-        self.faces = mesh.F
-        self.vtx = [vertex(pos=vector(*p), color=mesh_color) for p in self.base]
-        for (i, j, k) in self.faces:
-            triangle(v0=self.vtx[i], v1=self.vtx[j], v2=self.vtx[k])
+        tris = []
+        for (i, j, k) in mesh.F:
+            p0 = mesh.V[i]
+            p1 = mesh.V[j]
+            p2 = mesh.V[k]
+            
+            v0 = vertex(pos=vector(p0[0], p0[1], p0[2]), color=mesh_color)
+            v1 = vertex(pos=vector(p1[0], p1[1], p1[2]), color=mesh_color)
+            v2 = vertex(pos=vector(p2[0], p2[1], p2[2]), color=mesh_color)
+            
+            tris.append(triangle(v0=v0, v1=v1, v2=v2))
+
+        self.obj = compound(tris)
+        self.obj.color = mesh_color
 
     def sync(self, x: np.ndarray, q: np.ndarray):
+        self.obj.pos = vector(x[0], x[1], x[2])
         R = Quaternion.to_R(q)
-        for i in range(self.base.shape[0]):
-            p = R @ self.base[i] + x
-            self.vtx[i].pos = vector(p[0], p[1], p[2])
+        ax = R[:, 0]
+        up = R[:, 1]
+        
+        current_len_x = self.obj.length
+        current_len_y = self.obj.height
+        
+        self.obj.axis = vector(ax[0], ax[1], ax[2]) * current_len_x
+        self.obj.up   = vector(up[0], up[1], up[2]) * current_len_y
 
 
 class VpythonBoxVisual:
@@ -228,18 +243,16 @@ class BodyFrameDebugView:
 
         # Trail
         if self.trail is not None and self.trail_enable:
+            x = np.asarray(body.x, dtype=float)
+            p = vector(x[0], x[1], x[2])
+            
+            # Append new point
+            self.trail.append(pos=p)
             self._trail_points.append(p)
-            if len(self._trail_points) > self.trail_max:
-                self._trail_points.pop(0)
 
-                # rebuild
-                self.trail.visible = False
-                self.trail = curve(color=color.gray(0.4))
-                #self._rebuild_trail()
-                for pt in self._trail_points:
-                    self.trail.append(pt)
-                self.trail.visible = True
-            else:
-                self.trail.append(p)
+            # Efficiently remove old point without recreating the object
+            if self.trail.npoints > self.trail_max:
+                # Remove the first point (index 0)
+                self.trail.pop(0)
 
 
