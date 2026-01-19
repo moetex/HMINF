@@ -3,8 +3,8 @@ import trimesh
 
 from src.model.material import Material
 from src.model.colliders import ColliderHandle
-from src.res.MathHelpers import Quaternion
-from src.res.MathHelpers import Transform
+from src.util.MathHelpers import Quaternion
+from src.util.MathHelpers import Transform
 
 
 

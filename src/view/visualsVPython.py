@@ -6,7 +6,7 @@ from vpython import (
 )
 
 from src.model import stlMesh
-from src.res.MathHelpers import Quaternion
+from src.util.MathHelpers import Quaternion
 
 from vpython import compound, vector, vertex, triangle, color
 
