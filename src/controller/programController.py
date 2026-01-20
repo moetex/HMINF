@@ -136,7 +136,7 @@ class Simulation:
         """Erstellt den Würfel-Body"""
         cube_size = np.array([0.05, 0.05, 0.05], dtype=float)
         cube_collider = ColliderHandle(lambda T: colliders.Box(T, cube_size))
-        cube_visual = VpythonBoxVisual(cube_size, color_=color.gray(0.7), opacity=0.9)
+        cube_visual = VpythonBoxVisual(cube_size, color_=color.orange, opacity=0.9)
 
         # Starrkörper erstellen
         self.body_cube = RigidBody(
@@ -266,8 +266,7 @@ class Simulation:
         if self.has_started:
             return      # nicht während Simulation änderbar
 
-        #new_material = MaterialLibary.get(material_name)
-        new_material = MaterialLibrary.get(material_name)   # TODO
+        new_material = MaterialLibrary.get(material_name)
         print("change_mesh_material: " + new_material.name)
 
         # Neuberechnung der physikalischen Eigenschaften
@@ -278,6 +277,8 @@ class Simulation:
         if hasattr(self.body_mesh, "volume_m3"):
             self.body_mesh.mass = new_material.density * self.body_mesh.volume_m3
             self.body_mesh.inv_mass = 1.0 / self.body_mesh.mass if self.body_mesh.mass > 0 else 0.0
+
+        self.body_mesh.visual.set_color(new_material.color)
 
         print(f"Mesh Material {material_name} (Masse: {self.body_mesh.mass:.3f} kg)")
 
@@ -296,6 +297,7 @@ class Simulation:
             self.body_cube.mass = new_material.density * self.body_cube.volume_m3
             self.body_cube.inv_mass = 1.0 / self.body_cube.mass if self.body_cube.mass > 0 else 0.0
 
+        self.body_cube.visual.set_color(new_material.color)
         print(f"Cube Material: {material_name} (Masse: {self.body_cube.mass:.3f} kg)")
 
     def set_mesh_speed(self, factor: float):

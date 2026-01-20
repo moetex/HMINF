@@ -10,7 +10,7 @@ from src.controller.programController import Simulation
 
 def main():
     """Haupteinstiegspunkt"""
-    stl_path = "res/labubu_keychain_voxel_mc_16k.stl"
+    stl_path = "../res/labubu_keychain_voxel_mc_16k.stl"
 
     try:
         sim = Simulation(stl_path)

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Dict
-
+from vpython import color
 
 @dataclass(frozen=True)
 class Material:
@@ -17,7 +17,7 @@ class Material:
     #restitution: float
     #static_friction: float
     #kinetic_friction: float
-    #color: tuple = (0.5, 0.5, 0.5)
+    color: object
 
     """
     def __post_init__(self):
@@ -45,8 +45,8 @@ class MaterialLibrary:
     #HOLZ = Material("Holz", 425.0)
 
     MATERIALS = {
-        'Holz': Material("Holz", 425.0),
-        'Stahl': Material("Stahl", 785.0),
+        'Holz': Material("Holz", 425.0, color.orange),
+        'Stahl': Material("Stahl", 785.0, color.gray(0.7)),
 
     }
 

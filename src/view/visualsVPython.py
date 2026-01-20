@@ -11,34 +11,46 @@ from src.util.MathHelpers import Quaternion
 from vpython import compound, vector, vertex, triangle, color
 
 class VpythonTriangleMeshView:
-    """Renders a triangle mesh (V, F). Updates by applying R,p to base vertices."""
-    def __init__(self, mesh: stlMesh, mesh_color=color.gray(0.75)):
+    def __init__(self, mesh: stlMesh, mesh_color=color.orange):
+        self.mesh = mesh
+        self._last_x = np.zeros(3)
+        self._last_q = np.array([1, 0, 0, 0], float)
+        self._build(mesh_color)
+
+    def _build(self, c):
         tris = []
-        for (i, j, k) in mesh.F:
-            p0 = mesh.V[i]
-            p1 = mesh.V[j]
-            p2 = mesh.V[k]
-            
-            v0 = vertex(pos=vector(p0[0], p0[1], p0[2]), color=mesh_color)
-            v1 = vertex(pos=vector(p1[0], p1[1], p1[2]), color=mesh_color)
-            v2 = vertex(pos=vector(p2[0], p2[1], p2[2]), color=mesh_color)
-            
+        for (i, j, k) in self.mesh.F:
+            p0 = self.mesh.V[i]
+            p1 = self.mesh.V[j]
+            p2 = self.mesh.V[k]
+
+            v0 = vertex(pos=vector(*p0), color=c)
+            v1 = vertex(pos=vector(*p1), color=c)
+            v2 = vertex(pos=vector(*p2), color=c)
+
             tris.append(triangle(v0=v0, v1=v1, v2=v2))
 
         self.obj = compound(tris)
-        self.obj.color = mesh_color
+        self.sync(self._last_x, self._last_q)
+
+    def set_color(self, c):
+        self.obj.visible = False
+        del self.obj
+
+        self._build(c)
 
     def sync(self, x: np.ndarray, q: np.ndarray):
+        self._last_x = np.asarray(x, float).copy()
+        self._last_q = np.asarray(q, float).copy()
+
         self.obj.pos = vector(x[0], x[1], x[2])
+
         R = Quaternion.to_R(q)
         ax = R[:, 0]
         up = R[:, 1]
-        
-        current_len_x = self.obj.length
-        current_len_y = self.obj.height
-        
-        self.obj.axis = vector(ax[0], ax[1], ax[2]) * current_len_x
-        self.obj.up   = vector(up[0], up[1], up[2]) * current_len_y
+
+        self.obj.axis = vector(ax[0], ax[1], ax[2])
+        self.obj.up = vector(up[0], up[1], up[2])
 
 
 class VpythonBoxVisual:
@@ -60,6 +72,9 @@ class VpythonBoxVisual:
 
         up = R[:, 1]
         self.obj.up = vector(up[0], up[1], up[2])
+
+    def set_color(self, c):
+        self.obj.color = c
 
 class BoxWireframe:
     @staticmethod
