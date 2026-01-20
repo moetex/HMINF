@@ -10,7 +10,11 @@ requires-python = ">=3.13"
 dependencies = [
     "trimesh (>=4.10.0,<5.0.0)",
     "raylib (>=5.5.0.3,<6.0.0.0)",
-    "pybullet (>=3.2.7,<4.0.0)"
+    "pybullet (>=3.2.7,<4.0.0)",
+    "kiwisolver>=1.4.9",
+    "vpython>=7.6.5",
+    "distance3d>=0.9.0",
+    "fast-simplification>=0.1.13",
 ]
 
 [tool.hatch.build.targets.wheel]
