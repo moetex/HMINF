@@ -106,7 +106,7 @@ class Simulation:
 
         # Visualisierungs-Mesh
         tm_vis = trimesh.Trimesh(vertices=mesh_raw.V, faces=mesh_raw.F, process=False)
-        tm_vis_s = tm_vis.simplify_quadric_decimation(face_count=3000)  # 3000 Faces als Startwert
+        tm_vis_s = tm_vis.simplify_quadric_decimation(face_count=900)  # 3000 Faces als Startwert
         mesh_vis_m = STLMesh(tm_vis_s.vertices * 1e-3, tm_vis_s.faces)
 
         # Physik-Mesh (konvexe Hülle)
