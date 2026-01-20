@@ -2,12 +2,7 @@ from __future__ import annotations
 import sys
 import traceback
 
-from pathlib import Path
 from src.controller.programController import Simulation
-from src.util.config import SimConfig
-from src.util.log import setup_logging
-from src.sim.core import SimulationCore
-from src.view.vpython_ui import VpythonUI
 
 
 # ----------------------------------------
