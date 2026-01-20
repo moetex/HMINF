@@ -27,7 +27,7 @@ class Simulation:
     def __init__(self, stl_path: str):
         # Physik-Parameter
         self.dt = 1.0 / 240.0   # 120
-        self.solver_iters = 10    #8
+        self.solver_iters = 25    #8
         self.damping = 1.0 #0.9995
 
         # Container/Welt
@@ -411,7 +411,7 @@ class Simulation:
             self._store_contacts(c)
 
         for _ in range(self.solver_iters):
-            self._solve_contacts()
+           self._solve_contacts()
 
         for b in (self.body_mesh, self.body_cube):
             b.v *= self.damping
