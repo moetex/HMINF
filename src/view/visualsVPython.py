@@ -176,7 +176,6 @@ class BodyFrameDebugView:
         self.omg = arrow(color=color.magenta, schaftwidth=0.006, visible=self.show_w_dir)
 
         # Trail
-        #self.show_trail = bool(show_trail)
         self.trail_max = int(trail_max)
         self._trail_points = []
 
@@ -193,8 +192,6 @@ class BodyFrameDebugView:
         self.ax_z.visible = self.gizmo_enable
         self.vel.visible = self.gizmo_enable and self.show_v_dir
         self.omg.visible = self.gizmo_enable and self.show_w_dir
-        #if self.trail is not None:
-        #    self.trail.visible = self.enable and self.show_trail
 
     def set_trail_visible(self, visible: bool):
         self.trail_enable = bool(visible)
@@ -230,9 +227,6 @@ class BodyFrameDebugView:
         arr.visible = True
 
     def sync(self, body):
-        #if not self.enable:
-        #    return
-
         x = np.asarray(body.x, dtype=float)
         R = body.R()
         p = vector(x[0], x[1], x[2])
@@ -251,11 +245,6 @@ class BodyFrameDebugView:
                 w = np.asarray(body.w, float)
                 self._set_fixed_arrows(self.omg, p, w, self.w_len)
 
-        #v = np.asarray(body.v, dtype=float)
-        #w = np.asarray(body.w, dtype=float)
-        #self.vel.pos = p; self.vel.axis = vector(v[0], v[1], v[2]) * self.vec_scale_v
-        #self.omg.pos = p; self.omg.axis = vector(w[0], w[1], w[2]) * self.vec_scale_w
-
         # Trail
         if self.trail is not None and self.trail_enable:
             x = np.asarray(body.x, dtype=float)
@@ -267,7 +256,6 @@ class BodyFrameDebugView:
 
             # Efficiently remove old point without recreating the object
             if self.trail.npoints > self.trail_max:
-                # Remove the first point (index 0)
                 self.trail.pop(0)
 
 

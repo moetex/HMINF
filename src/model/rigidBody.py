@@ -28,7 +28,6 @@ class RigidBody:
                  *,
                  material: Material,
                  shape: str,
-                 # shape parms:
                  size_xyz_m: np.ndarray | None = None,
                  mesh_V_m: np.ndarray | None = None,
                  mesh_F: np.ndarray | None = None,
@@ -56,25 +55,10 @@ class RigidBody:
             self.mesh_V_m = np.array(mesh_V_m, dtype=float, copy=True)
             self.mesh_F = np.array(mesh_F, dtype=np.int32, copy=True)
 
-        #self.mass = float(mass)
-        #self.inv_mass = 0.0 if self.mass <= 0 else 1.0 / self.mass
-
-        # inertia in BODY frame (3x3), and inverse
-        #self.Ib = np.array(inertia_body, dtype=float)
-        #if self.inv_mass == 0:
-        #    self.inv_Ib = np.zeros((3, 3), dtype=float)
-        #else:
-        #    self.inv_Ib = np.linalg.inv(self.Ib)
-
         self.x = np.array(x, dtype=float)
         self.q = Quaternion.normalize(np.array(q, dtype=float))
         self.v = np.array(v, dtype=float)
         self.w = np.array(w, dtype=float)
-
-        #self.restitution = float(restitution)
-
-        #self.collider_factory = collider_factory
-        #self.collider = None
 
         self.collider_handle = collider
 
@@ -128,12 +112,6 @@ class RigidBody:
         self.collider_handle.sync(self.pose())
         if self.visual and self.visual is not None:
             self.visual.sync(self.x, self.q)
-
-    #def sync_collider(self):
-    #    # collider neu bauen
-    #    self.collider = self.collider_factory(pose_from_xq(self.x, self.q))
-    #    if self.visual_sync:
-    #        self.visual_sync(self)
 
     def step(self, dt, sync_visual: bool = True):
         self.x += self.v * dt
@@ -195,8 +173,6 @@ class RigidBody:
             return float(volume), Ib
 
         raise ValueError(f"Unknown shape {shape!r}")
-
-
 
 
 def inertia_box(mass, size_xyz):

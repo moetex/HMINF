@@ -62,8 +62,6 @@ class ImpulseSolver:
         if vn >= 0.0:
             return
 
-        #e = min(a.restitution, b.restitution)
-
         # --- Materialpaar-Eigenschaften ---
         props = self.pair_lookup.get(a. material, b.material)
         mu_s = props.mu_s

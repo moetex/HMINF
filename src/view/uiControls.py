@@ -7,9 +7,6 @@ from typing import Optional, Callable, Dict
 
 from vpython import checkbox, canvas, color, slider, menu, button, rate, wtext
 
-#from src.controller.programController import Simulation
-
-
 # ----------------------------------------
 # Ui Style Manager
 # ----------------------------------------
@@ -215,7 +212,6 @@ class UISlider(UIComponent):
             value=self.config.initial_val,
             step=self.config.step,
             bind=self._on_change
-            #,canvas=self.scene   # TODO
         )
 
         self.scene.append_to_caption("<br>")
@@ -237,12 +233,6 @@ class UISlider(UIComponent):
         if self.value_text:
             formatted = self._format_value(value)
             self.value_text.text = f"{formatted} {self.config.unit}"
-
-        #self.scene.append_to_caption(f"""
-        #<script>
-        #    document.getElementById('{self.value_id}').textContent = '{self._format_value(value)}');
-        #</script>
-        #""")
 
     def _format_value(self, value: float) -> str:
         """Formatiert den Wert für die Anzeige"""
@@ -287,7 +277,6 @@ class UICheckbox(UIComponent):
             text=self.label,
             checked=self.checked,
             bind=self._on_change
-            #,canvas=self.scene   #TODO
         )
         self.scene.append_to_caption("</div>")
         return self
@@ -324,7 +313,7 @@ class UIMenu(UIComponent):
             selected=self.selected,
             bind=self._on_change,
             width=240,
-            canvas=self.scene   #TODO
+            canvas=self.scene
         )
         self.scene.append_to_caption("<br>")
         return self
@@ -351,9 +340,7 @@ class UIButton(UIComponent):
 
     def render(self):
         """Rendert den Button"""
-        #self.scene.append_to_caption("<div class='bnt-group'>")
-        self.button_widget = button(text=self.text, bind=self._on_click, canvas=self.scene) #TODO
-        #self.scene.append_to_caption(f"</div>")
+        self.button_widget = button(text=self.text, bind=self._on_click, canvas=self.scene)
         return self
 
     def _on_click(self, evt):
@@ -383,7 +370,7 @@ class UISection:
 
     def begin(self):
         """Startet die Section"""
-        self.scene.append_to_caption(f"<div class='ui-section'><h3>{self.icon} {self.title}</h3>")   #TODO ui-section
+        self.scene.append_to_caption(f"<div class='ui-section'><h3>{self.icon} {self.title}</h3>")
         return self
 
     def end(self):
@@ -402,7 +389,6 @@ class UISection:
         slider.render()
         self.components.append(slider)
         return slider
-        #return self.add_component(slider)
 
     def add_checkbox(self, label: str, checked: bool = True,
                      callback: Optional[Callable] = None) -> UICheckbox:
@@ -411,7 +397,6 @@ class UISection:
         cb.render()
         self.components.append(cb)
         return cb
-        #return self.add_component(cb)
 
     def add_menu(self, label: str, choices: list,
                  selected: Optional[str] = None,
@@ -421,7 +406,6 @@ class UISection:
         m.render()
         self.components.append(m)
         return m
-        #return self.add_component(m)
 
     def add_button(self, text: str, callback: Callable) -> UIButton:
         """Fügt einen Button hinzu"""
@@ -429,7 +413,6 @@ class UISection:
         btn.render()
         self.components.append(btn)
         return btn
-        #return self.add_component(btn)
 
     def add_info_box(self, text: str):
         """Fügt eine Info-Box hinzu"""
@@ -461,34 +444,23 @@ class SimulationUIController:
         # Styles injizieren
         self.scene.append_to_caption(UIStyleManager.get_slidebar_style())
 
-        # Sidebar Container öffnen
-        #self.scene.append_to_caption("<div class='control-panel'>")    # TODO
-
         # Sections erstellen
         self._create_control_section()
         self._create_material_section()
         self._create_parameter_section()
         self._create_visualization_section()
 
-        # Sidebar schließen
-        #self.scene.append_to_caption("</div>")
-
     def _create_control_section(self):
         """Erstellt die Steuerungs-Sektion"""
         section = UISection(self.scene, "Simulation", "⚙️")
         section.begin()
-
-        #self.scene.append_to_caption("<div style='display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0;'>")
-        #self.scene.append_to_caption("<div class='btn-group'>")
 
         #Start/Pause Button
         self.run_button = section.add_button(
             "▶︎ Start",
             callback=self.sim_controller.toggle_run
         )
-
-        #self.scene.append_to_caption("<br>")
-        self.scene.append_to_caption("&nbsp;&nbsp;")    # TODO
+        self.scene.append_to_caption("&nbsp;&nbsp;")
 
         # Reset Button
         section.add_button(
@@ -509,14 +481,14 @@ class SimulationUIController:
         # Material Mesh
         section.add_menu(
             label="Mesh Material",
-            choices=['Holz', 'Stahl', '[Aluminium]', '[Gummi]'],
+            choices=['Holz', 'Stahl'],  #, '[Aluminium]', '[Gummi]'
             callback=lambda m: self.sim_controller.change_mesh_material(m)
         )
 
         # Material Cube
         section.add_menu(
             label="Cube Material",
-            choices=['Holz', 'Stahl', '[Aluminium]', '[Gummi]'],
+            choices=['Holz', 'Stahl'], #, '[Aluminium]', '[Gummi]'
             callback=lambda m: self.sim_controller.change_cube_material(m)
         )
 
@@ -529,45 +501,30 @@ class SimulationUIController:
         section = UISection(self.scene, "Parameter", "📊")
         section.begin()
 
-        # Damping Slider
-
-        # Mesh Speed Slider
-        #self.scene.append_to_caption("<div style='margin: 10px 0;'>")
         mesh_speed_label = wtext(text="Geschw. Mesh: ")
         mesh_speed_value = wtext(text=f"{1.0:.1f}x")
         self.scene.append_to_caption("<br>")
 
-        self.mesh_speed_slider = slider( #section.add_slider(SliderConfig(
-            #label="Geschw. Mesh",
+        self.mesh_speed_slider = slider(
             min=0.0,
             max=2.0,
             value=1.0,
             step=0.01,
-            #unit="x",
-            #value_id="mesh-speed-val",
-            #callback=self.sim_controller.set_mesh_speed
             bind=lambda s: self._update_mesh_speed(s, mesh_speed_value)
         )
-        #self.scene.append_to_caption("</div>")
 
         # Cube Speed Slider
-        #self.scene.append_to_caption("<div style='margin: 10px 0;'>")
         cube_speed_label = wtext(text="<br>Geschw. Cube: ")
         cube_speed_value = wtext(text=f"{1.0:.1f}x")
         self.scene.append_to_caption("<br>")
 
-        self.cube_speed_slider = slider( #section.add_slider(SliderConfig(
-            #label="Geschw. Cube",
+        self.cube_speed_slider = slider(
             min=0.0,
             max=2.0,
             value=1.0,
             step=0.01,
-            #unit="x",
-            #value_id="cube-speed-val",
-            #callback=self.sim_controller.set_cube_speed
             bind=lambda s: self._update_cube_speed(s, cube_speed_value)
         )
-        #self.scene.append_to_caption("</div>")
 
         section.end()
         self.sections['parameter'] = section
@@ -613,10 +570,6 @@ class SimulationUIController:
 
     def lock_speed_sliders(self, locked: bool):
         """Sperrt/Entsperrt die Geschwindigkeits-Slider"""
-        #if self.mesh_speed_slider:
-        #    self.mesh_speed_slider.set_enabled(not locked)
-        #if self.cube_speed_slider:
-        #    self.cube_speed_slider.set_enabled(not locked)
         pass
 
     def _update_mesh_speed(self, s, value_weight):
@@ -649,67 +602,7 @@ class VPythonSceneBuilder:
             background=color.white,
         )
         scene.range = 0.25,
-        #scene.caption = ""
         return scene
-
-# ----------------------------------------
-# Beispiel-Verwendung (für tests)
-# ----------------------------------------
-"""
-Implementierung in programmCOntroller.py integrieren
-"""
-"""
-if __name__ == "__main__":
-
-    # Mock Simulation Controller
-    class MockSimController:
-        def __init__(self):
-            self.running = False
-
-        def toggle_run(self):
-            self.running = not self.running
-            print(f"Running: {self.running}")
-
-        def reset(self):
-            print("Reset called")
-
-        def change_mesh_material(self, material):
-            print(f"Mesh Material: {material}")
-
-        def change_cube_material(self, material):
-            print(f"Cube Material: {material}")
-
-        def set_mesh_speed_value(self, value):
-            print(f"Set mesh speed value: {value}")
-
-        def set_cube_speed_value(self, value):
-            print(f"Set cube speed value: {value}")
-
-        def toggle_arrows(self, checked: bool):
-            print(f"Toggle arrows checked: {checked}")
-
-        def toggle_contacts(self, checked: bool):
-            print(f"Toggle contacts checked: {checked}")
-
-        def toggle_trail(self, checked: bool):
-            print(f"Toggle trail checked: {checked}")
-
-    # Szene erstellen
-    scene = VPythonSceneBuilder.create_scene("Test UI")
-
-    # UI Controller erstellen
-    mock_controller = MockSimController()
-    ui = SimulationUIController(scene, mock_controller)
-
-    print("UI erfolgreich erstellt")
-
-    while True:
-        rate(60)
-
-"""
-
-
-
 
 
 

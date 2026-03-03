@@ -14,23 +14,7 @@ class Material:
 
     name: str
     density: float
-    #restitution: float
-    #static_friction: float
-    #kinetic_friction: float
     color: object
-
-    """
-    def __post_init__(self):
-        #""Validierung der Materialeigenschaften.""
-        if self.density <= 0:
-            raise ValueError("Dichte muss positiv sein")
-        if not 0 <= self.restitution <= 1:
-            raise ValueError("Restitution muss zwischen 0 und 1 liegen")
-        if self.static_friction < 0 or self.kinetic_friction < 0:
-            raise ValueError("Reibungskoeffizienten müssen nicht-negativ sein")
-        if self.static_friction < self.kinetic_friction:
-            raise ValueError("Haftreibung muss größer oder gleich Gleitreibung sein")
-    """
 
 @dataclass(frozen=True)
 class PairProps:
@@ -41,12 +25,10 @@ class PairProps:
 
 class MaterialLibrary:
     """verwaltet vordefinierte Materialien"""
-    #STAHL = Material("Stahl", 7850.0)
-    #HOLZ = Material("Holz", 425.0)
 
     MATERIALS = {
         'Holz': Material("Holz", 425.0, color.orange),
-        'Stahl': Material("Stahl", 785.0, color.gray(0.7)),
+        'Stahl': Material("Stahl", 7850.0, color.gray(0.7)),
 
     }
 
@@ -70,5 +52,5 @@ class PairLookup:
         name = frozenset((a.name, b.name))
         if name in cls._pars:
             return cls._pars[name]
-        # Fallback (wenn Paar fehlt): moderate Standardwerte
+        # Fallback (wenn Paar fehlt)
         return PairProps(mu_s=0.4, mu_k=0.25, e=0.5)

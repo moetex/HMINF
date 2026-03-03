@@ -36,17 +36,8 @@ def main():
     stl_path = resource_path("labubu.stl")
     with open(stl_path, "rb") as f:
         f.read(16)
-    print("DEBUG STL open OK")
 
     try:
-        print("DEBUG sys.executable:", sys.executable)
-        print("DEBUG cwd:", os.getcwd())
-        print("DEBUG stl_path repr:", repr(stl_path))
-
-        p = Path(stl_path)
-        print("DEBUG exists:", p.exists(), "is_file:", p.is_file())
-        print("DEBUG abs:", str(p.resolve()))
-        print("DEBUG parent list:", [x.name for x in p.parent.glob("*")])
         sim = Simulation(stl_path)
         sim.run()
     except FileNotFoundError as e:

@@ -12,7 +12,6 @@ class Quaternion:
 
     @staticmethod
     def mul(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:  # Quaternionen multiplikation
-        # (w,x,y,z)
         w1, x1, y1, z1 = q1
         w2, x2, y2, z2 = q2
         return np.array([
